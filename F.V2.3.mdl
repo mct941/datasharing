@@ -1,0 +1,106 @@
+; 
+$PROBLEM PK TAK063 parent in study TAK063_104
+$INPUT ID SUBJID TIME TAD DV MDV CMT AMT ADDL II DOSE CMP DROP POP AGE SEX RACE  
+BW BMI LBM DROP CRCL DROP DROP DROP DROP DROP EXCL DROP DROP DROP DROP DROP FLAG2
+$DATA NM.PK.TAK063.v3.prn IGNORE=#
+IGNORE= (CMT.EQ.3)  ; TAK-063 parent observations
+IGNORE= (EXCL.GT.0) ; Excluded parent observations (placebo, no sample collected, predose obs day 1)
+IGNORE= (FLAG2.EQ.31) ; Excluded parent observations (all observations before day 7)
+IGNORE= (FLAG2.EQ.35)
+IGNORE= (FLAG2.EQ.36)
+IGNORE= (FLAG2.EQ.101)
+IGNORE= (FLAG2.EQ.105)
+IGNORE= (FLAG2.EQ.106)
+IGNORE= (FLAG2.EQ.201)
+IGNORE= (FLAG2.EQ.205)
+IGNORE= (FLAG2.EQ.206)
+IGNORE= (FLAG2.EQ.301)
+IGNORE= (FLAG2.EQ.305)
+IGNORE= (FLAG2.EQ.306)
+IGNORE= (FLAG2.EQ.1001)
+IGNORE= (FLAG2.EQ.1005)
+IGNORE= (FLAG2.EQ.1006)
+;
+$SUBROUTINES ADVAN5
+$MODEL 
+COMP = (DEPOT)    ; TAK-063 dose
+COMP = (CENTRAL)  ; Central compartment TAK-063
+COMP = (ABS1)     ; TAK-063 absorption transit compartment (1-7)
+COMP = (ABS2)
+COMP = (ABS3)
+COMP = (ABS4)
+COMP = (ABS5)
+COMP = (ABS6)
+COMP = (ABS7)
+COMP = (PERIPH)    ; Peripheral compartment TAK-063
+$PK
+; Covariate effects
+CV3=THETA(12) *(LOG(BMI)-LOG(25.9))     ; V2~BMI
+;
+; TAK-063 PK
+K13  = THETA(1)*EXP(ETA(1))             ; Absorption rate
+K34=K13
+K45=K13
+K56=K13
+K67=K13
+K78=K13
+K89=K13
+K92=K13
+;
+TVCL = THETA(2)
+CL   = TVCL*EXP(ETA(2))                 ; Clearance
+;
+TVV2 = THETA(3)*(1+CV3)
+V2   = TVV2                             ; Central volume of distribution
+;
+TVF1 = THETA(4)
+IF (DOSE.EQ.10) TVF1 = THETA(6)
+IF (DOSE.EQ.20) TVF1 = THETA(7)
+IF (DOSE.EQ.30) TVF1 = THETA(8)
+IF (DOSE.EQ.100) TVF1 = THETA(9)
+F1   = TVF1*EXP(ETA(3))                 ; Bioavailability (dose-dependent, with 3 mg as reference value)
+;
+Q = THETA(10)                           ; Intercompartmental clearance
+V3 = THETA(11)                          ; Peripheral volume of distribution
+;
+S2   = V2/1000
+K20 = CL/V2
+K210 = Q/V2
+K102 = Q/V3
+;
+$ERROR
+IPRED = A(2)/S2
+W     = SQRT(THETA(5))*IPRED
+IRES  = IPRED-DV
+IWRES = IRES/W
+Y     = IPRED+W*ERR(1)
+;
+A1=A(1)
+A2=A(2)
+$THETA
+(0,  6.50   )   ; TH1 KA
+(0,  6.46  )    ; TH2 CL
+(0,  119  )     ; TH3 V2
+(1 FIX  )       ; TH4 F1 3 mg
+(0,  0.0232  )  ; TH5 Proportional residual error 
+(0,  0.860,1)   ; TH6 F1 10 mg 
+(0,  0.748 ,1)  ; TH7 F1 20 mg 
+(0,  0.691 ,1)  ; TH8 F1 30 mg 
+(0,  0.270 ,1)  ; TH9 F1 100 mg 
+(0,  6.46 )     ; TH10 Q
+(0,  2940 )     ; TH11 V3
+( 0.649      )  ; TH12 V2~BMI
+;
+$OMEGA
+0.212           ; ET1 on KA
+0.126           ; ET2 on CL
+0.0198          ; ET3 on F1
+$SIGMA
+1 FIX        
+$EST MAXEVAL=9999 PRINT=5 NOABORT METHOD=1 INTERACTION POSTHOC ;No CWRES
+PARAFILE=parafpi.pnm
+$COV COMP  PARAFILE=parafpi.pnm
+$TABLE ID TIME TAD K13 TVCL CL TVV2 V2 TVF1 F1 DOSE BMI 
+CWRES IPRED ETA1 ETA2 ETA3
+NOPRINT ONEHEADER  
+FILE=F.V2.3.pc.r.par
